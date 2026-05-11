@@ -37,8 +37,7 @@ def bitlabs_wall_url(uid: int) -> str:
 
 def adgem_wall_url(uid: int) -> str:
     """رابط جدار عروض AdGem — App ID: 32570"""
-    return f"https://wall.adgem.com/?app_id={ADGEM_APP_ID}&user_id={uid}"
-
+   return f"https://api.adgem.com/v1/wall?appid={ADGEM_APP_ID}&player_id={uid}"
 
 def fetch_balance(uid: int) -> dict | None:
     try:
