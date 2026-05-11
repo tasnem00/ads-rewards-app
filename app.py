@@ -483,6 +483,65 @@ uid = st.number_input(
     help      = "أدخل الـ ID الخاص بك على المنصة",
 )
 
+# ─────────────────────────────────────────────
+#  جلب الرصيد  (مباشرة بعد خانة الـ UID)
+# ─────────────────────────────────────────────
+col_fetch, col_refresh = st.columns([3, 1])
+
+with col_fetch:
+    fetch_clicked = st.button("🔍  جلب رصيدي", use_container_width=True)
+
+with col_refresh:
+    refresh_clicked = st.button("↻", use_container_width=True, help="تحديث الرصيد")
+
+if fetch_clicked or refresh_clicked:
+    logger.info("🖱️ جلب الرصيد | uid=%s", uid)
+    with st.spinner("جارٍ الاتصال بالخادم…"):
+        data = fetch_balance(uid)
+    if data:
+        st.session_state.user_data    = data
+        st.session_state.last_refresh = time.time()
+        st.session_state.fetch_error  = ""
+        logger.info("💾 تم تخزين بيانات %s", uid)
+    else:
+        st.session_state.fetch_error = f"تعذّر الاتصال أو المستخدم {uid} غير موجود."
+        logger.warning("❌ فشل جلب uid=%s", uid)
+
+if st.session_state.fetch_error:
+    st.markdown(
+        f'<div class="rh-alert error">⚠️ {st.session_state.fetch_error}</div>',
+        unsafe_allow_html=True,
+    )
+
+# بطاقة الرصيد (تظهر هنا مباشرة إذا كانت البيانات موجودة)
+user = st.session_state.user_data
+if user:
+    username = user.get("username", "—")
+    balance  = user.get("balance", 0.0)
+    age_str  = "—"
+    if st.session_state.last_refresh:
+        age = int(time.time() - st.session_state.last_refresh)
+        age_str = f"منذ {age} ث" if age < 60 else f"منذ {age//60} د"
+
+    st.markdown(f"""
+    <div class="balance-card">
+        <div class="username-tag">👤 {username}</div>
+        <div class="balance-label">رصيدك الحالي</div>
+        <div class="balance-value">{balance:,.4f}</div>
+        <div class="balance-currency">USD · آخر تحديث: {age_str}</div>
+    </div>
+    """, unsafe_allow_html=True)
+    logger.info("🖥️ عرض الرصيد | uid=%s | %.4f", uid, balance)
+    st.markdown(
+        '<div class="rh-alert warn">💡 أكمل عرضاً ثم اضغط ↻ لترى رصيدك المُحدَّث فوراً.</div>',
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        '<div class="rh-alert info" style="justify-content:center">💡 اضغط <strong>جلب رصيدي</strong> لعرض رصيدك بعد إتمام العروض.</div>',
+        unsafe_allow_html=True,
+    )
+
 
 # ─────────────────────────────────────────────
 #  عنوان قسم المنصات
@@ -653,14 +712,13 @@ body {{ background:transparent; padding:6px 0; }}
         <span class="tag">🌍 متاح عالمياً</span>
     </div>
     <div class="btn-wrap">
-        <a class="btn-inner" href="{wall_url_bl}" target="_blank" rel="noopener noreferrer"
-           onclick="window.open('{wall_url_bl}','_blank','noopener,noreferrer');return false;">
+        <button class="btn-inner" onclick="window.open('{wall_url_bl}','_blank')">
             <span class="btn-icon">🎁</span>
             <div>
                 <div class="btn-text">ابدأ مع BitLabs الآن</div>
                 <div class="btn-sub">افتح جدار العروض</div>
             </div>
-        </a>
+        </button>
     </div>
 </div>
 </body>
@@ -839,7 +897,6 @@ body {{ background:transparent; padding:6px 0; }}
             <div class="status-dot"></div>
             AdGem
         </div>
-        <span class="pending-badge">⏳ قيد الموافقة</span>
     </div>
     <div class="card-title">العروض والتطبيقات والمسابقات</div>
     <div class="card-sub">تنزيل تطبيقات • إكمال مهام • عروض خاصة • uid: {uid}</div>
@@ -849,17 +906,13 @@ body {{ background:transparent; padding:6px 0; }}
         <span class="tag">🏆 Contests</span>
     </div>
     <div class="btn-wrap">
-        <a class="btn-inner" href="{wall_url_ag}" target="_blank" rel="noopener noreferrer"
-           onclick="window.open('{wall_url_ag}','_blank','noopener,noreferrer');return false;">
+        <button class="btn-inner" onclick="window.open('{wall_url_ag}','_blank')">
             <span class="btn-icon">🚀</span>
             <div>
                 <div class="btn-text">افتح AdGem</div>
                 <div class="btn-sub">Explore Offers</div>
             </div>
-        </a>
-    </div>
-    <div class="notice-box">
-        ⚡ App ID: <strong>32570</strong> — الزر جاهز تقنياً. فور موافقة AdGem على حسابك سيعمل مباشرة.
+        </button>
     </div>
 </div>
 </body>
@@ -868,68 +921,6 @@ body {{ background:transparent; padding:6px 0; }}
 
 
 st.markdown('<hr class="rh-divider">', unsafe_allow_html=True)
-
-
-# ─────────────────────────────────────────────
-#  جلب الرصيد
-# ─────────────────────────────────────────────
-col_fetch, col_refresh = st.columns([3, 1])
-
-with col_fetch:
-    fetch_clicked = st.button("🔍  جلب رصيدي", use_container_width=True)
-
-with col_refresh:
-    refresh_clicked = st.button("↻", use_container_width=True, help="تحديث الرصيد")
-
-if fetch_clicked or refresh_clicked:
-    logger.info("🖱️ جلب الرصيد | uid=%s", uid)
-    with st.spinner("جارٍ الاتصال بالخادم…"):
-        data = fetch_balance(uid)
-    if data:
-        st.session_state.user_data    = data
-        st.session_state.last_refresh = time.time()
-        st.session_state.fetch_error  = ""
-        logger.info("💾 تم تخزين بيانات %s", uid)
-    else:
-        st.session_state.fetch_error = f"تعذّر الاتصال أو المستخدم {uid} غير موجود."
-        logger.warning("❌ فشل جلب uid=%s", uid)
-
-if st.session_state.fetch_error:
-    st.markdown(
-        f'<div class="rh-alert error">⚠️ {st.session_state.fetch_error}</div>',
-        unsafe_allow_html=True,
-    )
-
-# ─────────────────────────────────────────────
-#  بطاقة الرصيد
-# ─────────────────────────────────────────────
-user = st.session_state.user_data
-if user:
-    username = user.get("username", "—")
-    balance  = user.get("balance", 0.0)
-    age_str  = "—"
-    if st.session_state.last_refresh:
-        age = int(time.time() - st.session_state.last_refresh)
-        age_str = f"منذ {age} ث" if age < 60 else f"منذ {age//60} د"
-
-    st.markdown(f"""
-    <div class="balance-card">
-        <div class="username-tag">👤 {username}</div>
-        <div class="balance-label">رصيدك الحالي</div>
-        <div class="balance-value">{balance:,.4f}</div>
-        <div class="balance-currency">USD · آخر تحديث: {age_str}</div>
-    </div>
-    """, unsafe_allow_html=True)
-    logger.info("🖥️ عرض الرصيد | uid=%s | %.4f", uid, balance)
-    st.markdown(
-        '<div class="rh-alert warn">💡 أكمل عرضاً ثم اضغط ↻ لترى رصيدك المُحدَّث فوراً.</div>',
-        unsafe_allow_html=True,
-    )
-else:
-    st.markdown(
-        '<div class="rh-alert info" style="justify-content:center">💡 اضغط <strong>جلب رصيدي</strong> لعرض رصيدك بعد إتمام العروض.</div>',
-        unsafe_allow_html=True,
-    )
 
 
 # ─────────────────────────────────────────────
