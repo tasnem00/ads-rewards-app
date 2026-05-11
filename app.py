@@ -27,8 +27,8 @@ logger = logging.getLogger("frontend")
 # ─────────────────────────────────────────────
 RAILWAY_URL   = "https://ads-rewards-app-production.up.railway.app"
 BITLABS_TOKEN = "DCDEC791-3E5B-484D-B11C-3404631079D0"
-ADGEM_APP_ID  = "YOUR_ADGEM_APP_ID"      # ← ضع App ID من لوحة AdGem
-ADGEM_API_KEY = "YOUR_ADGEM_API_KEY"     # ← ضع API Key من لوحة AdGem
+ADGEM_APP_ID  = "32570"
+ADGEM_API_KEY = "YOUR_ADGEM_API_KEY"     # ← ضع API Key من لوحة AdGem إن وُجد
 
 
 def bitlabs_wall_url(uid: int) -> str:
@@ -36,11 +36,7 @@ def bitlabs_wall_url(uid: int) -> str:
 
 
 def adgem_wall_url(uid: int) -> str:
-    """
-    رابط جدار عروض AdGem.
-    استبدل YOUR_ADGEM_APP_ID بالـ App ID الحقيقي من dashboard.adgem.com
-    بعد الموافقة على حسابك.
-    """
+    """رابط جدار عروض AdGem — App ID: 32570"""
     return f"https://wall.adgem.com/?app_id={ADGEM_APP_ID}&user_id={uid}"
 
 
@@ -863,8 +859,7 @@ body {{ background:transparent; padding:6px 0; }}
         </a>
     </div>
     <div class="notice-box">
-        ⚠️ هذه المنصة في انتظار الموافقة النهائية من AdGem. الزر جاهز تقنياً —
-        فور حصولك على App ID الرسمي، ضعه في <code>ADGEM_APP_ID</code> بالكود وسيعمل فوراً.
+        ⚡ App ID: <strong>32570</strong> — الزر جاهز تقنياً. فور موافقة AdGem على حسابك سيعمل مباشرة.
     </div>
 </div>
 </body>
