@@ -10,6 +10,7 @@ import logging
 import time
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 
 # ─────────────────────────────────────────────
 #  Logging
@@ -29,7 +30,7 @@ BITLABS_TOKEN = "DCDEC791-3E5B-484D-B11C-3404631079D0"
 
 
 def bitlabs_wall_url(uid: int) -> str:
-    return f"https://web.bitlabs.ai?token={BITLABS_TOKEN}&uid={uid}"
+    return f"https://web.bitlabs.ai/?token={BITLABS_TOKEN}&uid={uid}"
 
 
 def fetch_balance(uid: int) -> dict | None:
@@ -275,24 +276,115 @@ uid = st.number_input(
     help      = "أدخل الـ ID الخاص بك على المنصة",
 )
 
+# ─────────────────────────────────────────────
+#  زر العروض  — يظهر دائماً بعد خانة الـ ID
+#  نستخدم components.html لضمان فتح الرابط
+#  في نافذة جديدة بشكل مضمون على كل المتصفحات
+# ─────────────────────────────────────────────
+wall_url = bitlabs_wall_url(uid)
+logger.info("🔗  توليد رابط BitLabs | uid=%s | url=%s", uid, wall_url)
+
+components.html(f"""
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  * {{ margin:0; padding:0; box-sizing:border-box; }}
+  body {{ background:transparent; padding: 8px 0 4px; }}
+
+  .btn-outer {{
+    position: relative;
+    border-radius: 18px;
+    padding: 3px;
+    background: linear-gradient(135deg, #f0c040, #e8a020, #f0c040);
+    background-size: 200% 200%;
+    animation: shimmer 2.5s ease infinite;
+    box-shadow: 0 6px 32px rgba(240,192,64,0.35), 0 2px 8px rgba(0,0,0,0.4);
+  }}
+  @keyframes shimmer {{
+    0%   {{ background-position: 0% 50%; }}
+    50%  {{ background-position: 100% 50%; }}
+    100% {{ background-position: 0% 50%; }}
+  }}
+
+  .btn-inner {{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    padding: 18px 24px;
+    background: linear-gradient(135deg, #f5c842 0%, #e09018 100%);
+    border-radius: 15px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition: filter .2s ease, transform .15s ease;
+  }}
+  .btn-inner:hover  {{ filter: brightness(1.08); transform: translateY(-2px); }}
+  .btn-inner:active {{ transform: translateY(0px); filter: brightness(0.96); }}
+
+  .btn-icon {{
+    font-size: 1.6rem;
+    line-height: 1;
+    animation: bounce 1.8s ease infinite;
+  }}
+  @keyframes bounce {{
+    0%,100% {{ transform: translateY(0); }}
+    45%     {{ transform: translateY(-5px); }}
+  }}
+
+  .btn-text {{
+    font-family: 'Syne', sans-serif;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #0a0a0f;
+    letter-spacing: 0.3px;
+    text-align: center;
+  }}
+  .btn-sub {{
+    font-family: 'Syne', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: rgba(10,10,15,0.55);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }}
+</style>
+</head>
+<body>
+  <div class="btn-outer">
+    <a class="btn-inner" href="{wall_url}" target="_blank" rel="noopener noreferrer"
+       onclick="window.open('{wall_url}','_blank','noopener,noreferrer'); return false;">
+      <span class="btn-icon">🎁</span>
+      <div>
+        <div class="btn-text">ابدأ كسب المكافآت الآن</div>
+        <div class="btn-sub">BitLabs · uid {uid}</div>
+      </div>
+    </a>
+  </div>
+</body>
+</html>
+""", height=90)
+
+st.markdown('<hr class="rh-divider">', unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────
+#  جلب الرصيد
+# ─────────────────────────────────────────────
 col_fetch, col_refresh = st.columns([3, 1])
 
 with col_fetch:
-    fetch_clicked = st.button("🔍  جلب بياناتي", use_container_width=True)
+    fetch_clicked = st.button("🔍  جلب رصيدي", use_container_width=True)
 
 with col_refresh:
     refresh_clicked = st.button("↻", use_container_width=True, help="تحديث الرصيد")
 
-# ─────────────────────────────────────────────
-#  جلب البيانات
-# ─────────────────────────────────────────────
-should_fetch = fetch_clicked or refresh_clicked or (
-    st.session_state.user_data and
-    st.session_state.user_data.get("id") != uid
-)
-
 if fetch_clicked or refresh_clicked:
-    logger.info("🖱️  المستخدم طلب جلب البيانات | uid=%s", uid)
+    logger.info("🖱️  المستخدم طلب جلب الرصيد | uid=%s", uid)
     with st.spinner("جارٍ الاتصال بالخادم…"):
         data = fetch_balance(uid)
     if data:
@@ -304,9 +396,6 @@ if fetch_clicked or refresh_clicked:
         st.session_state.fetch_error = f"تعذّر الاتصال بالخادم أو المستخدم {uid} غير موجود."
         logger.warning("❌  فشل جلب بيانات uid=%s", uid)
 
-# ─────────────────────────────────────────────
-#  عرض الخطأ
-# ─────────────────────────────────────────────
 if st.session_state.fetch_error:
     st.markdown(
         f'<div class="rh-alert error">⚠️ {st.session_state.fetch_error}</div>',
@@ -314,23 +403,20 @@ if st.session_state.fetch_error:
     )
 
 # ─────────────────────────────────────────────
-#  بطاقة الرصيد + زر BitLabs
+#  بطاقة الرصيد
 # ─────────────────────────────────────────────
 user = st.session_state.user_data
 
 if user:
-    username    = user.get("username", "—")
-    balance     = user.get("balance", 0.0)
-    wall_url    = bitlabs_wall_url(uid)
+    username = user.get("username", "—")
+    balance  = user.get("balance", 0.0)
 
-    # وقت آخر تحديث
     if st.session_state.last_refresh:
-        age = int(time.time() - st.session_state.last_refresh)
+        age     = int(time.time() - st.session_state.last_refresh)
         age_str = f"منذ {age} ث" if age < 60 else f"منذ {age//60} د"
     else:
         age_str = "—"
 
-    # ── بطاقة الرصيد ──
     st.markdown(f"""
     <div class="balance-card">
         <div class="username-tag">👤 {username}</div>
@@ -342,46 +428,12 @@ if user:
 
     logger.info("🖥️  عرض بطاقة الرصيد | uid=%s | balance=%.4f", uid, balance)
 
-    # ── معلومات ──
-    st.markdown('<hr class="rh-divider">', unsafe_allow_html=True)
-
-    st.markdown(f"""
-    <div class="info-pill">
-        <span class="icon">🔗</span>
-        <span>الخادم: <strong>{RAILWAY_URL}</strong></span>
-    </div>
-    <div class="info-pill">
-        <span class="icon">🎯</span>
-        <span>مزود العروض: <strong>BitLabs</strong></span>
-    </div>
-    <div class="info-pill">
-        <span class="icon">🆔</span>
-        <span>User ID المُرسَل: <strong>{uid}</strong></span>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # ── زر BitLabs ──
-    st.markdown('<hr class="rh-divider">', unsafe_allow_html=True)
-
-    st.markdown(f"""
-    <div class="bl-btn-wrap">
-        <a class="bl-btn" href="{wall_url}" target="_blank">
-            <span>🎮</span> افتح جدار العروض — BitLabs
-        </a>
-    </div>
-    """, unsafe_allow_html=True)
-
     st.markdown(
-        '<div class="rh-alert warn">💡 أكمل عرضاً ثم اضغط ↻ أعلاه لترى رصيدك المُحدَّث.</div>',
+        '<div class="rh-alert warn">💡 أكمل عرضاً في BitLabs ثم اضغط ↻ لترى رصيدك المُحدَّث.</div>',
         unsafe_allow_html=True,
     )
-
-    logger.info("🔗  تم توليد رابط BitLabs لـ uid=%s", uid)
-
 else:
-    # حالة فارغة — قبل أي بحث
-    st.markdown("""
-    <div class="rh-alert warn" style="text-align:center; padding:1.5rem;">
-        🔍 أدخل رقم مستخدمك ثم اضغط <strong>جلب بياناتي</strong>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        '<div class="rh-alert warn" style="text-align:center">💡 اضغط <strong>جلب رصيدي</strong> لعرض رصيدك بعد إتمام العروض.</div>',
+        unsafe_allow_html=True,
+    )
