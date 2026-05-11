@@ -31,7 +31,7 @@ BITLABS_TOKEN = "DCDEC791-3E5B-484D-B11C-3404631079D0"
 RAILWAY_URL = "https://ads-rewards-app-production.up.railway.app"
 BITLABS_TOKEN = "DCDEC791-3E5B-484D-B11C-3404631079D0"
 ADGEM_APP_ID = "32570"
-ADGEM_API_KEY = "e063f1kg5nlc9nl0i5mkb7ba"  # تم وضع المفتاح الذي ظهر في صورتك
+ADGEM_API_KEY = "18ehcha512g8f0fjcdj1gel2"  # تم وضع المفتاح الذي ظهر في صورتك
 
 def bitlabs_wall_url(uid: int) -> str:
     return f"https://web.bitlabs.ai/?token={BITLABS_TOKEN}&uid={uid}"
