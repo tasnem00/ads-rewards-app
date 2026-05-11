@@ -27,19 +27,18 @@ logger = logging.getLogger("frontend")
 # ─────────────────────────────────────────────
 RAILWAY_URL   = "https://ads-rewards-app-production.up.railway.app"
 BITLABS_TOKEN = "DCDEC791-3E5B-484D-B11C-3404631079D0"
-ADGEM_APP_ID  = "32570"
-ADGEM_API_KEY = "YOUR_ADGEM_API_KEY"     # ← ضع API Key من لوحة AdGem إن وُجد
-
+# --- الإعدادات ---
+RAILWAY_URL = "https://ads-rewards-app-production.up.railway.app"
+BITLABS_TOKEN = "DCDEC791-3E5B-484D-B11C-3404631079D0"
+ADGEM_APP_ID = "32570"
+ADGEM_API_KEY = "e063f1kg5nlc9nl0i5mkb7ba"  # تم وضع المفتاح الذي ظهر في صورتك
 
 def bitlabs_wall_url(uid: int) -> str:
     return f"https://web.bitlabs.ai/?token={BITLABS_TOKEN}&uid={uid}"
 
-
 def adgem_wall_url(uid: int) -> str:
-    """رابط جدار عروض AdGem — App ID: 32570"""
-   return f"https://api.adgem.com/v1/wall?appid={ADGEM_APP_ID}&player_id={uid}"
-
-def fetch_balance(uid: int) -> dict | None:
+    # الرابط المحدث والآمن لفتح جدار عروض AdGem
+    return f"https://api.adgem.com/v1/wall?appid={ADGEM_APP_ID}&player_id={uid}"
     try:
         resp = requests.get(f"{RAILWAY_URL}/users/{uid}", timeout=8)
         if resp.status_code == 200:
