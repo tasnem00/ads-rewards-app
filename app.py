@@ -33,33 +33,125 @@ def bl_url(uid):
 def ag_url(uid):
     return f"https://adunits.adgem.com/wall?appid={ADGEM_APP_ID}&player_id={uid}"
 
+HEADERS = {
+    "Content-Type":  "application/json",
+    "Accept":        "application/json",
+    "User-Agent":    "RewardsHub/5.0",
+    "X-App-Source": "streamlit-frontend",
+}
+
+def _get(path: str, **kw):
+    return requests.get(f"{RAILWAY_URL}{path}", headers=HEADERS, timeout=10, **kw)
+
+def _post(path: str, payload: dict):
+    return requests.post(f"{RAILWAY_URL}{path}", headers=HEADERS,
+                         json=payload, timeout=10)
+
+def diagnose_server() -> str:
+    """يفحص الخادم ويعيد تقريراً نصياً مختصراً"""
+    lines = []
+    tests = [
+        ("GET /",              lambda: _get("/")),
+        ("GET /users",         lambda: _get("/users")),
+        ("GET /users/1",       lambda: _get("/users/1")),
+        ("GET /docs",          lambda: _get("/docs")),
+        ("GET /openapi.json",  lambda: _get("/openapi.json")),
+    ]
+    for name, fn in tests:
+        try:
+            r = fn()
+            snippet = r.text[:80].replace("\n"," ")
+            lines.append(f"[{r.status_code}] {name}  →  {snippet}")
+        except Exception as e:
+            lines.append(f"[ERR] {name}  →  {e}")
+    return "\n".join(lines)
+
 def fetch_or_create(username: str):
+    """
+    استراتيجية متعددة المراحل:
+    1. جلب بـ username  ← GET /users/by_username/{username}
+    2. جلب بـ email     ← GET /users/by_email/{username}
+    3. بحث عام         ← GET /users?username={username}
+    4. إنشاء حساب جديد ← POST /users
+    """
+    username = username.strip()
+    logger.info("🔑 auth attempt: %s", username)
+
+    # ── المرحلة 1: by_username ──────────────────────
     try:
-        r = requests.get(f"{RAILWAY_URL}/users/by_username/{username}", timeout=8)
+        r = _get(f"/users/by_username/{username}")
+        logger.info("  /by_username → %s", r.status_code)
         if r.status_code == 200:
             d = r.json()
-            logger.info("✅ login %s bal=%.4f", username, d.get("balance", 0))
+            logger.info("✅ found by_username | bal=%.4f", d.get("balance", 0))
             return d
-        if r.status_code == 404:
-            c = requests.post(f"{RAILWAY_URL}/users",
-                              json={"username": username}, timeout=8)
-            if c.status_code in (200, 201):
-                d = c.json()
-                logger.info("🆕 new user %s", username)
-                return d
     except Exception as e:
-        logger.error("❌ %s", e)
+        logger.warning("  by_username err: %s", e)
+
+    # ── المرحلة 2: by_email ─────────────────────────
+    if "@" in username:
+        try:
+            r = _get(f"/users/by_email/{username}")
+            logger.info("  /by_email → %s", r.status_code)
+            if r.status_code == 200:
+                d = r.json()
+                logger.info("✅ found by_email | bal=%.4f", d.get("balance", 0))
+                return d
+        except Exception as e:
+            logger.warning("  by_email err: %s", e)
+
+    # ── المرحلة 3: query param ?username= ───────────
+    try:
+        r = _get(f"/users", params={"username": username})
+        logger.info("  /users?username → %s", r.status_code)
+        if r.status_code == 200:
+            data = r.json()
+            # قد يكون list أو dict
+            if isinstance(data, list) and data:
+                d = data[0]
+                logger.info("✅ found by query | bal=%.4f", d.get("balance", 0))
+                return d
+            if isinstance(data, dict) and data.get("id"):
+                logger.info("✅ found by query dict | bal=%.4f", data.get("balance", 0))
+                return data
+    except Exception as e:
+        logger.warning("  query err: %s", e)
+
+    # ── المرحلة 4: إنشاء حساب جديد ─────────────────
+    payload = {"username": username}
+    if "@" in username:
+        payload["email"] = username
+
+    try:
+        r = _post("/users", payload)
+        logger.info("  POST /users → %s | body: %s", r.status_code, r.text[:200])
+        if r.status_code in (200, 201):
+            d = r.json()
+            logger.info("🆕 created | id=%s", d.get("id"))
+            return d
+        # قد يكون المستخدم موجوداً بالفعل (conflict 409)
+        if r.status_code == 409:
+            logger.info("  409 conflict — user exists, trying GET /users/{username}")
+            r2 = _get(f"/users/{username}")
+            if r2.status_code == 200:
+                return r2.json()
+        logger.error("  POST failed %s: %s", r.status_code, r.text[:300])
+    except Exception as e:
+        logger.error("  POST err: %s", e)
+
     return None
+
 
 def refresh_balance(uid):
     try:
-        r = requests.get(f"{RAILWAY_URL}/users/{uid}", timeout=8)
+        r = _get(f"/users/{uid}")
         if r.status_code == 200:
             d = r.json()
             logger.info("🔄 uid=%s bal=%.4f", uid, d.get("balance", 0))
             return d
+        logger.warning("refresh_balance → %s", r.status_code)
     except Exception as e:
-        logger.error("❌ %s", e)
+        logger.error("❌ refresh: %s", e)
     return None
 
 # ── page setup ────────────────────────────────────────
@@ -310,7 +402,11 @@ body{{background:transparent;margin:0;padding:0}}
                     login_err="", show_login=False, login_reason="")
                 st.rerun()
             else:
-                st.session_state.login_err = "Server unreachable. Please try again."
+                st.session_state.login_err = (
+                    "⚠ Could not connect to server. "
+                    "Make sure the Railway backend is running — "
+                    "check Railway → View Logs for details."
+                )
                 st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
