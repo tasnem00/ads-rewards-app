@@ -823,7 +823,7 @@ body{{background:transparent;padding:4px 0 8px;}}
 <body>
 <div class="notice">
   <div><div class="n-lbl">Your Balance</div><div class="n-val">${balance:,.4f}</div></div>
-  <div style="text-align:right"><div class="n-lbl">Minimum</div><div class="n-val dim">$5.00</div></div>
+  <div style="text-align:right"><div class="n-lbl">Minimum</div><div class="n-val dim">$2.00</div></div>
 </div>
 <div class="grid">
   <div class="m"><div class="m-icon">💙</div>
