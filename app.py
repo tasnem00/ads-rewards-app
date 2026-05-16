@@ -22,10 +22,10 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger("rewards_hub")
 
 # ── config ────────────────────────────────────────────
-RAILWAY_URL       = "https://ads-rewards-app-production.up.railway.app"
+RAILWAY_URL       = "https://web-production-864fec.up.railway.app"   # ← تم التحديث
 BITLABS_TOKEN     = "DCDEC791-3E5B-484D-B11C-3404631079D0"
 ADGEM_APP_ID      = "32570"
-ADGEM_POSTBACK    = "hgda9gcjc891dljf0n9lha13"   # ← المفتاح الجديد
+ADGEM_POSTBACK    = "hgda9gcjc891dljf0n9lha13"
 
 def bl_url(uid):
     return f"https://web.bitlabs.ai/?token={BITLABS_TOKEN}&uid={uid}"
@@ -48,7 +48,6 @@ def _post(path: str, payload: dict):
                          json=payload, timeout=10)
 
 def diagnose_server() -> str:
-    """يفحص الخادم ويعيد تقريراً نصياً مختصراً"""
     lines = []
     tests = [
         ("GET /",              lambda: _get("/")),
@@ -67,13 +66,6 @@ def diagnose_server() -> str:
     return "\n".join(lines)
 
 def fetch_or_create(username: str):
-    """
-    استراتيجية متعددة المراحل:
-    1. جلب بـ username  ← GET /users/by_username/{username}
-    2. جلب بـ email     ← GET /users/by_email/{username}
-    3. بحث عام         ← GET /users?username={username}
-    4. إنشاء حساب جديد ← POST /users
-    """
     username = username.strip()
     logger.info("🔑 auth attempt: %s", username)
 
@@ -106,7 +98,6 @@ def fetch_or_create(username: str):
         logger.info("  /users?username → %s", r.status_code)
         if r.status_code == 200:
             data = r.json()
-            # قد يكون list أو dict
             if isinstance(data, list) and data:
                 d = data[0]
                 logger.info("✅ found by query | bal=%.4f", d.get("balance", 0))
@@ -129,10 +120,9 @@ def fetch_or_create(username: str):
             d = r.json()
             logger.info("🆕 created | id=%s", d.get("id"))
             return d
-        # قد يكون المستخدم موجوداً بالفعل (conflict 409)
         if r.status_code == 409:
-            logger.info("  409 conflict — user exists, trying GET /users/{username}")
-            r2 = _get(f"/users/{username}")
+            logger.info("  409 conflict — user exists, trying GET /users/by_username/")
+            r2 = _get(f"/users/by_username/{username}")
             if r2.status_code == 200:
                 return r2.json()
         logger.error("  POST failed %s: %s", r.status_code, r.text[:300])
@@ -163,8 +153,8 @@ for k, v in {
     "user_data":     None,
     "last_refresh":  0,
     "login_err":     "",
-    "show_login":    False,   # modal تسجيل الدخول
-    "login_reason":  "",      # سبب طلب الدخول
+    "show_login":    False,
+    "login_reason":  "",
     "tab":           "offers",
 }.items():
     if k not in st.session_state:
@@ -210,7 +200,6 @@ html, body,
 [data-testid="stDecoration"]  { display: none !important; }
 [data-testid="block-container"] { padding-top: 0 !important; }
 
-/* animated mesh */
 [data-testid="stAppViewContainer"]::before {
   content: ''; position: fixed; inset: 0; z-index: -2;
   background:
@@ -225,14 +214,12 @@ html, body,
   50%  { filter: hue-rotate(8deg)  brightness(1.04); }
   100% { filter: hue-rotate(-5deg) brightness(.97);  }
 }
-/* noise grain */
 [data-testid="stAppViewContainer"]::after {
   content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
   background-size: 180px 180px; opacity: .6;
 }
 
-/* inputs */
 [data-testid="stTextInput"] input {
   background: var(--glass2) !important;
   border: 1px solid var(--rim) !important;
@@ -268,10 +255,8 @@ html, body,
   box-shadow: 0 0 18px rgba(201,168,76,.12) !important;
 }
 
-/* divider */
 .div { border: none; border-top: 1px solid var(--rim); margin: 1.4rem 0; }
 
-/* alerts */
 .alert { border-radius: var(--rsm); padding: .8rem 1rem; font-size: .83rem;
          margin: .5rem 0; display: flex; gap: .6rem; align-items: flex-start; }
 .alert.err  { background:rgba(220,60,60,.07);  border:1px solid rgba(220,60,60,.2);  color:#f08080; }
@@ -279,13 +264,11 @@ html, body,
 .alert.info { background:rgba(91,142,240,.07); border:1px solid rgba(91,142,240,.18);color:var(--blue); }
 .alert.ok   { background:rgba(62,207,142,.07); border:1px solid rgba(62,207,142,.18);color:var(--green); }
 
-/* footer */
 .foot { text-align:center; padding:2rem 1rem; font-size:.75rem; color:var(--text3);
         border-top:1px solid var(--rim); margin-top:2rem; }
 .foot a { color:var(--golddim); text-decoration:none; transition:color .2s; }
 .foot a:hover { color:var(--gold); }
 
-/* modal (terms) */
 .modal { display:none; position:fixed; inset:0; z-index:9998;
          background:rgba(5,5,10,.92); backdrop-filter:blur(10px);
          align-items:flex-start; justify-content:center;
@@ -311,10 +294,9 @@ html, body,
 
 
 # ════════════════════════════════════════════════════
-#  HELPER: LOGIN MODAL  (يُعرض فوق أي صفحة)
+#  HELPER: LOGIN MODAL
 # ════════════════════════════════════════════════════
 def maybe_show_login_modal():
-    """يعرض مودال تسجيل الدخول عندما show_login=True"""
     if not st.session_state.show_login:
         return
 
@@ -370,7 +352,6 @@ body{{background:transparent;margin:0;padding:0}}
 </body></html>
 """, height=320)
 
-    # الحقل والزر عبر Streamlit داخل المودال
     st.markdown('<div style="max-width:440px;margin:0 auto;margin-top:-12px">', unsafe_allow_html=True)
 
     col_x, col_main = st.columns([1, 8])
@@ -413,7 +394,7 @@ body{{background:transparent;margin:0;padding:0}}
 
 
 # ════════════════════════════════════════════════════
-#  NAVBAR  (مشتركة بين الصفحتين)
+#  NAVBAR
 # ════════════════════════════════════════════════════
 def render_navbar():
     user = st.session_state.user_data
@@ -488,7 +469,7 @@ nav{{
 
 
 # ════════════════════════════════════════════════════
-#  HERO SECTION  (يُعرض دائماً)
+#  HERO SECTION
 # ════════════════════════════════════════════════════
 def render_hero():
     components.html("""
@@ -545,7 +526,7 @@ body{background:transparent;padding:36px 0 28px;text-align:center;}
 
 
 # ════════════════════════════════════════════════════
-#  OFFER CARDS  (يُعرضان دائماً — زر مقفول للضيوف)
+#  OFFER CARDS
 # ════════════════════════════════════════════════════
 def render_offer_cards():
     logged = st.session_state.logged_in
@@ -553,11 +534,6 @@ def render_offer_cards():
 
     _bl = bl_url(uid) if logged else "#"
     _ag = ag_url(uid) if logged else "#"
-
-    lock_js_bl = "" if logged else \
-        "window.__triggerLogin('Sign in to unlock BitLabs surveys');"
-    lock_js_ag = "" if logged else \
-        "window.__triggerLogin('Sign in to unlock AdGem offers');"
 
     onclick_bl = f"window.open('{_bl}','_blank')" if logged else \
         "window.__triggerLogin('Sign in to start earning with BitLabs')"
@@ -597,15 +573,11 @@ body{{background:transparent;padding:4px 0;}}
   content:'';position:absolute;top:0;left:0;right:0;height:1px;
   background:linear-gradient(90deg,transparent,rgba(201,168,76,.25),transparent);
 }}
-.card.gold:hover{{
-  border-color:rgba(201,168,76,{'0.4' if logged else '0.1'});
+.card.gold:hover{{border-color:rgba(201,168,76,{'0.4' if logged else '0.1'});
   transform:translateY({'-3px' if logged else '0'});
-  box-shadow:{'0 16px 48px rgba(0,0,0,.35)' if logged else 'none'};
-}}
-.card.blue:hover{{
-  border-color:rgba(91,142,240,{'0.4' if logged else '0.1'});
-  transform:translateY({'-3px' if logged else '0'});
-}}
+  box-shadow:{'0 16px 48px rgba(0,0,0,.35)' if logged else 'none'};}}
+.card.blue:hover{{border-color:rgba(91,142,240,{'0.4' if logged else '0.1'});
+  transform:translateY({'-3px' if logged else '0'});}}
 .glow-gold{{position:absolute;top:-60px;right:-60px;width:200px;height:200px;
             background:radial-gradient(circle,rgba(201,168,76,.08) 0%,transparent 65%);pointer-events:none;}}
 .glow-blue{{position:absolute;top:-60px;right:-60px;width:200px;height:200px;
@@ -629,11 +601,9 @@ body{{background:transparent;padding:4px 0;}}
 .tag{{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:1.5px;
       text-transform:uppercase;padding:4px 11px;border-radius:6px;
       background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);color:#5a5a88;}}
-.cta{{
-  display:flex;align-items:center;justify-content:space-between;
-  border-radius:13px;padding:15px 20px;cursor:pointer;
-  transition:all .25s;border:none;width:100%;
-}}
+.cta{{display:flex;align-items:center;justify-content:space-between;
+      border-radius:13px;padding:15px 20px;cursor:pointer;
+      transition:all .25s;border:none;width:100%;}}
 .cta.gold{{background:linear-gradient(135deg,rgba(201,168,76,.1),rgba(201,168,76,.05));
            border:1px solid rgba(201,168,76,.2);}}
 .cta.gold:hover{{background:linear-gradient(135deg,rgba(201,168,76,.18),rgba(201,168,76,.09));
@@ -654,7 +624,6 @@ body{{background:transparent;padding:4px 0;}}
 .cta:hover .arr{{transform:translateX(4px);}}
 </style>
 <script>
-// bridge: يُطلقه الـ iframe ليُخبر Streamlit بطلب تسجيل الدخول
 window.__triggerLogin = function(reason){{
   window.parent.postMessage({{type:'login_request',reason:reason}},'*');
 }};
@@ -662,8 +631,6 @@ window.__triggerLogin = function(reason){{
 </head>
 <body>
 <div class="wrap">
-
-  <!-- BitLabs -->
   <div class="card gold">
     <div class="glow-gold"></div>
     {lock_overlay}
@@ -690,7 +657,6 @@ window.__triggerLogin = function(reason){{
     </button>
   </div>
 
-  <!-- AdGem -->
   <div class="card blue">
     <div class="glow-blue"></div>
     {lock_overlay}
@@ -716,14 +682,13 @@ window.__triggerLogin = function(reason){{
       <div class="arr blue">→</div>
     </button>
   </div>
-
 </div>
 </body></html>
 """, height=560)
 
 
 # ════════════════════════════════════════════════════
-#  BALANCE SECTION  (للمستخدمين المسجلين فقط)
+#  BALANCE SECTION
 # ════════════════════════════════════════════════════
 def render_balance_section():
     user    = st.session_state.user_data
@@ -743,12 +708,8 @@ def render_balance_section():
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:transparent;padding:4px 0 8px;}}
-.card{{
-  background:rgba(255,255,255,.03);
-  border:1px solid rgba(255,255,255,.08);
-  border-radius:22px;padding:28px 32px 24px;
-  position:relative;overflow:hidden;backdrop-filter:blur(20px);
-}}
+.card{{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);
+       border-radius:22px;padding:28px 32px 24px;position:relative;overflow:hidden;backdrop-filter:blur(20px);}}
 .card::before{{content:'';position:absolute;top:0;left:10%;right:10%;height:1px;
   background:linear-gradient(90deg,transparent,rgba(201,168,76,.5),transparent);}}
 .gtr{{position:absolute;top:-90px;right:-90px;width:260px;height:260px;
@@ -771,8 +732,7 @@ body{{background:transparent;padding:4px 0 8px;}}
 .id-val{{font-family:'DM Mono',monospace;font-size:.88rem;color:#c9a84c;letter-spacing:1px;}}
 .badges{{display:flex;flex-wrap:wrap;gap:8px;
          padding-top:20px;border-top:1px solid rgba(255,255,255,.05);}}
-.badge{{display:inline-flex;align-items:center;gap:6px;
-        padding:5px 12px;border-radius:99px;
+.badge{{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:99px;
         font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:1.5px;text-transform:uppercase;}}
 .bg{{background:rgba(62,207,142,.07);border:1px solid rgba(62,207,142,.18);color:#3ecf8e;}}
 .ba{{background:rgba(201,168,76,.07);border:1px solid rgba(201,168,76,.18);color:#c9a84c;}}
@@ -836,21 +796,17 @@ def render_withdraw():
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:transparent;padding:4px 0 8px;}}
-.notice{{
-  background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.12);
-  border-radius:14px;padding:16px 22px;
-  display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;
-}}
+.notice{{background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.12);
+         border-radius:14px;padding:16px 22px;
+         display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}}
 .n-lbl{{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:2.5px;
         text-transform:uppercase;color:#5a5a88;margin-bottom:4px;}}
 .n-val{{font-family:'Cormorant Garamond',serif;font-size:1.9rem;font-weight:300;color:#c9a84c;}}
 .n-val.dim{{color:#5a5a88;font-size:1.3rem;}}
 .grid{{display:grid;grid-template-columns:1fr 1fr;gap:10px;}}
-.m{{
-  background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.065);
-  border-radius:16px;padding:20px 18px;text-align:center;
-  position:relative;overflow:hidden;transition:border-color .3s,transform .2s;
-}}
+.m{{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.065);
+    border-radius:16px;padding:20px 18px;text-align:center;
+    position:relative;overflow:hidden;transition:border-color .3s,transform .2s;}}
 .m::before{{content:'';position:absolute;top:0;left:20%;right:20%;height:1px;
             background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);}}
 .m:hover{{border-color:rgba(255,255,255,.11);transform:translateY(-2px);}}
@@ -866,14 +822,8 @@ body{{background:transparent;padding:4px 0 8px;}}
 </style></head>
 <body>
 <div class="notice">
-  <div>
-    <div class="n-lbl">Your Balance</div>
-    <div class="n-val">${balance:,.4f}</div>
-  </div>
-  <div style="text-align:right">
-    <div class="n-lbl">Minimum</div>
-    <div class="n-val dim">$5.00</div>
-  </div>
+  <div><div class="n-lbl">Your Balance</div><div class="n-val">${balance:,.4f}</div></div>
+  <div style="text-align:right"><div class="n-lbl">Minimum</div><div class="n-val dim">$5.00</div></div>
 </div>
 <div class="grid">
   <div class="m"><div class="m-icon">💙</div>
@@ -897,7 +847,7 @@ body{{background:transparent;padding:4px 0 8px;}}
 
 
 # ════════════════════════════════════════════════════
-#  SIGN-IN TEASER  (للضيوف فقط — بعد بطاقات العروض)
+#  SIGN-IN TEASER
 # ════════════════════════════════════════════════════
 def render_signin_teaser():
     components.html("""
@@ -906,29 +856,19 @@ def render_signin_teaser():
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:transparent;padding:6px 0;}
-.teaser{
-  background:rgba(201,168,76,.04);
-  border:1px solid rgba(201,168,76,.14);
-  border-radius:18px;padding:24px 28px;
-  position:relative;overflow:hidden;text-align:center;
-}
-.teaser::before{
-  content:'';position:absolute;top:0;left:10%;right:10%;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(201,168,76,.3),transparent);
-}
+.teaser{background:rgba(201,168,76,.04);border:1px solid rgba(201,168,76,.14);
+        border-radius:18px;padding:24px 28px;position:relative;overflow:hidden;text-align:center;}
+.teaser::before{content:'';position:absolute;top:0;left:10%;right:10%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(201,168,76,.3),transparent);}
 .t-icon{font-size:1.8rem;margin-bottom:10px;}
 .t-title{font-family:'Cormorant Garamond',serif;font-size:1.35rem;font-weight:300;
           color:#e8e8f0;margin-bottom:6px;letter-spacing:.3px;}
 .t-sub{font-family:'Outfit',sans-serif;font-size:.82rem;color:#5a5a88;
        margin-bottom:20px;line-height:1.6;}
-.perks{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:0;}
-.perk{
-  font-family:'DM Mono',monospace;font-size:.6rem;
-  letter-spacing:1.5px;text-transform:uppercase;
-  padding:5px 12px;border-radius:99px;
-  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
-  color:#6060a0;
-}
+.perks{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;}
+.perk{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:1.5px;text-transform:uppercase;
+      padding:5px 12px;border-radius:99px;
+      background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);color:#6060a0;}
 </style></head>
 <body>
 <div class="teaser">
@@ -1000,24 +940,16 @@ def render_footer():
 # ════════════════════════════════════════════════════
 #  MAIN RENDER
 # ════════════════════════════════════════════════════
-
-# login modal فوق كل شيء إذا كان مطلوباً
 maybe_show_login_modal()
-
-# navbar
 render_navbar()
-
-# hero — دائماً
 render_hero()
 
 st.markdown('<hr class="div">', unsafe_allow_html=True)
 
-# balance + controls إذا كان مسجلاً
 if st.session_state.logged_in and st.session_state.user_data:
     render_balance_section()
     st.markdown('<hr class="div">', unsafe_allow_html=True)
 
-    # tab switcher
     t1, t2 = st.columns(2)
     with t1:
         if st.button("◈  Earn Rewards", use_container_width=True,
@@ -1039,7 +971,6 @@ if st.session_state.logged_in and st.session_state.user_data:
         render_withdraw()
 
 else:
-    # ضيف — يرى العروض (مقفولة) + teaser تسجيل
     render_offer_cards()
     st.markdown('<hr class="div">', unsafe_allow_html=True)
     render_signin_teaser()
