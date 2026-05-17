@@ -1,9 +1,8 @@
 """
-app.py  —  Rewards Hub  |  Streamlit Frontend  v7
+app.py  —  Rewards Hub  |  Streamlit Frontend  v8
 ──────────────────────────────────────────────────
-• إصلاح مشكلة "يرجى ملء جميع الحقول" رغم أن الحقول مملوءة
-  السبب: st.rerun() داخل st.form يمسح قيم الحقول قبل قراءتها
-  الحل:  نقل if submitted: خارج with st.form تماماً
+• حفظ الجلسة في Cookies → لا تنتهي عند الـ refresh
+• إصلاح مشكلة st.form + st.rerun
 """
 
 import hashlib
@@ -15,6 +14,7 @@ import time
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
+from streamlit_cookies_manager import EncryptedCookieManager
 
 # ─────────────────────────────────────────────
 #  Logging
@@ -33,11 +33,12 @@ logger = logging.getLogger("frontend")
 # ─────────────────────────────────────────────
 #  Config
 # ─────────────────────────────────────────────
-RAILWAY_URL = "https://harmonious-recreation-production.up.railway.app"
+RAILWAY_URL   = "https://harmonious-recreation-production.up.railway.app"
 BITLABS_TOKEN = "DCDEC791-3E5B-484D-B11C-3404631079D0"
 ADGEM_APP_ID  = "32570"
 CPX_APP_ID    = "33109"
 CPX_SECURE    = "S5BVhx4aOGlnHQb06cvkhI09VN2K3ASY"
+COOKIE_SECRET = "RewardsHub!CookieSecret2024XYZ!!"  # 32 حرف على الأقل
 
 HEADERS = {"Content-Type": "application/json", "Accept": "application/json"}
 
@@ -62,17 +63,29 @@ def cpx_url(uid):
 #  API helpers
 # ─────────────────────────────────────────────
 
+def _safe_json(r) -> dict:
+    try:
+        if r.text.strip():
+            return r.json()
+    except Exception:
+        pass
+    return {}
+
+
 def api_register(username: str, email: str, password: str) -> tuple:
     try:
         r = requests.post(f"{RAILWAY_URL}/auth/register",
                           json={"username": username, "email": email, "password": password},
-                          headers=HEADERS, timeout=10)
+                          headers=HEADERS, timeout=15)
         if r.status_code == 201:
-            logger.info("✅ تسجيل ناجح | username=%s", username)
-            return r.json(), ""
-        err = r.json().get("detail", "خطأ غير معروف")
-        logger.warning("❌ فشل التسجيل | %s", err)
+            data = _safe_json(r)
+            if data:
+                return data, ""
+            return None, "استجابة غير صالحة من الخادم."
+        err = _safe_json(r).get("detail", f"خطأ {r.status_code}")
         return None, err
+    except requests.exceptions.Timeout:
+        return None, "انتهت مهلة الاتصال، حاول مجدداً."
     except Exception as e:
         logger.error("❌ API register error: %s", e)
         return None, "تعذّر الاتصال بالخادم."
@@ -80,17 +93,18 @@ def api_register(username: str, email: str, password: str) -> tuple:
 
 def api_login(identifier: str, password: str) -> tuple:
     try:
-        logger.info("📤 إرسال: identifier='%s' | password_len=%d",
-                    identifier, len(password))
         r = requests.post(f"{RAILWAY_URL}/auth/login",
                           json={"identifier": identifier, "password": password},
-                          headers=HEADERS, timeout=10)
+                          headers=HEADERS, timeout=15)
         if r.status_code == 200:
-            logger.info("✅ دخول ناجح | identifier=%s", identifier)
-            return r.json(), ""
-        err = r.json().get("detail", "خطأ غير معروف")
-        logger.warning("❌ فشل الدخول | %s", err)
+            data = _safe_json(r)
+            if data:
+                return data, ""
+            return None, "استجابة غير صالحة من الخادم."
+        err = _safe_json(r).get("detail", f"خطأ {r.status_code}")
         return None, err
+    except requests.exceptions.Timeout:
+        return None, "انتهت مهلة الاتصال، حاول مجدداً."
     except Exception as e:
         logger.error("❌ API login error: %s", e)
         return None, "تعذّر الاتصال بالخادم."
@@ -101,11 +115,7 @@ def api_me(token: str) -> dict:
         r = requests.get(f"{RAILWAY_URL}/auth/me",
                          headers=_auth_headers(token), timeout=10)
         if r.status_code == 200:
-            data = r.json()
-            logger.info("📊 /me | user_id=%s | balance=%.4f",
-                        data.get("user_id"), data.get("balance", 0))
-            return data
-        logger.warning("⚠️ /me أعاد %s", r.status_code)
+            return r.json()
     except Exception as e:
         logger.error("❌ API me error: %s", e)
     return None
@@ -115,6 +125,13 @@ def api_me(token: str) -> dict:
 #  إعداد الصفحة
 # ─────────────────────────────────────────────
 st.set_page_config(page_title="Rewards Hub", page_icon="💎", layout="centered")
+
+# ─────────────────────────────────────────────
+#  Cookies Manager  ← يحفظ الجلسة بعد الـ refresh
+# ─────────────────────────────────────────────
+cookies = EncryptedCookieManager(prefix="rh_", password=COOKIE_SECRET)
+if not cookies.ready():
+    st.stop()
 
 st.markdown("""
 <style>
@@ -148,8 +165,6 @@ html,body,[data-testid="stAppViewContainer"]{background:var(--bg)!important;font
     border:1px solid rgba(240,192,64,.25);color:var(--gold);
     font-size:.75rem;letter-spacing:1px;padding:.2rem .7rem;border-radius:99px;margin-bottom:.8rem;}
 
-.auth-box{background:var(--card);border:1px solid var(--border);
-    border-radius:var(--radius);padding:1.8rem;margin-top:.5rem;}
 .auth-title{font-family:'Syne',sans-serif;font-size:1.15rem;font-weight:700;
     color:var(--text);margin-bottom:1.2rem;text-align:center;}
 
@@ -191,9 +206,7 @@ for k, v in {
     "user":         None,
     "auth_tab":     "login",
     "auth_error":   "",
-    "auth_ok":      "",
     "last_refresh": 0,
-    # ↓ حقول مؤقتة لحفظ القيم عبر rerun
     "_login_id":    "",
     "_login_pw":    "",
     "_reg_user":    "",
@@ -205,6 +218,21 @@ for k, v in {
 }.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
+# ── استعادة الجلسة من Cookies عند الـ refresh ──
+if not st.session_state.token:
+    saved_token = cookies.get("token", "")
+    saved_user  = cookies.get("user_json", "")
+    if saved_token and saved_user:
+        import json
+        try:
+            st.session_state.token = saved_token
+            st.session_state.user  = json.loads(saved_user)
+            logger.info("🍪 جلسة مستعادة من Cookies")
+        except Exception:
+            cookies["token"]     = ""
+            cookies["user_json"] = ""
+            cookies.save()
 
 
 # ─────────────────────────────────────────────
@@ -244,35 +272,24 @@ if not st.session_state.token:
 
     # ══ نموذج تسجيل الدخول ══════════════════════
     if st.session_state.auth_tab == "login":
-        st.markdown('<div class="auth-title">أهلاً بعودتك 👋</div>',
-                    unsafe_allow_html=True)
+        st.markdown('<div class="auth-title">أهلاً بعودتك 👋</div>', unsafe_allow_html=True)
 
-        # ✅ الإصلاح: نحفظ القيم في session_state أولاً
         with st.form("form_login"):
-            identifier = st.text_input(
-                "البريد الإلكتروني أو اسم المستخدم",
-                placeholder="you@example.com")
-            password = st.text_input(
-                "كلمة المرور", type="password",
-                placeholder="••••••••")
-            submitted = st.form_submit_button(
-                "تسجيل الدخول",
-                use_container_width=True,
-                type="primary")
-
-            # ✅ نحفظ القيم فوراً عند الضغط — قبل أي rerun
+            identifier = st.text_input("البريد الإلكتروني أو اسم المستخدم",
+                                        placeholder="you@example.com")
+            password   = st.text_input("كلمة المرور", type="password",
+                                        placeholder="••••••••")
+            submitted  = st.form_submit_button("تسجيل الدخول",
+                                                use_container_width=True, type="primary")
             if submitted:
-                st.session_state._login_id = identifier
-                st.session_state._login_pw = password
+                st.session_state._login_id        = identifier
+                st.session_state._login_pw        = password
                 st.session_state._login_submitted = True
 
-        # ✅ المنطق كله خارج الـ form — القيم محفوظة في session_state
         if st.session_state._login_submitted:
-            st.session_state._login_submitted = False  # reset
+            st.session_state._login_submitted = False
             _id = st.session_state._login_id.strip()
             _pw = st.session_state._login_pw
-
-            logger.info("🖱️ login submit | id='%s'", _id)
 
             if not _id or not _pw:
                 st.session_state.auth_error = "يرجى ملء جميع الحقول."
@@ -281,18 +298,21 @@ if not st.session_state.token:
                 with st.spinner("جارٍ التحقق…"):
                     data, err = api_login(_id, _pw)
                 if data:
+                    import json
                     st.session_state.token = data["token"]
                     st.session_state.user  = data
+                    # ← حفظ في Cookies
+                    cookies["token"]     = data["token"]
+                    cookies["user_json"] = json.dumps(data)
+                    cookies.save()
                     logger.info("✅ دخول | user_id=%s", data.get("user_id"))
                 else:
                     st.session_state.auth_error = err
-
             st.rerun()
 
     # ══ نموذج إنشاء الحساب ══════════════════════
     else:
-        st.markdown('<div class="auth-title">إنشاء حساب جديد 🚀</div>',
-                    unsafe_allow_html=True)
+        st.markdown('<div class="auth-title">إنشاء حساب جديد 🚀</div>', unsafe_allow_html=True)
 
         with st.form("form_register"):
             r_username = st.text_input("اسم المستخدم",    placeholder="ahmed_123")
@@ -302,26 +322,20 @@ if not st.session_state.token:
             r_pw2      = st.text_input("تأكيد كلمة المرور",
                                        type="password", placeholder="••••••••")
             submitted  = st.form_submit_button("إنشاء الحساب",
-                                               use_container_width=True,
-                                               type="primary")
-
-            # ✅ نحفظ القيم فوراً عند الضغط
+                                               use_container_width=True, type="primary")
             if submitted:
-                st.session_state._reg_user  = r_username
-                st.session_state._reg_email = r_email
-                st.session_state._reg_pw    = r_pw
-                st.session_state._reg_pw2   = r_pw2
+                st.session_state._reg_user      = r_username
+                st.session_state._reg_email     = r_email
+                st.session_state._reg_pw        = r_pw
+                st.session_state._reg_pw2       = r_pw2
                 st.session_state._reg_submitted = True
 
-        # ✅ المنطق كله خارج الـ form
         if st.session_state._reg_submitted:
-            st.session_state._reg_submitted = False  # reset
+            st.session_state._reg_submitted = False
             _user  = st.session_state._reg_user.strip()
             _email = st.session_state._reg_email.strip()
             _pw    = st.session_state._reg_pw
             _pw2   = st.session_state._reg_pw2
-
-            logger.info("🖱️ register submit | user='%s' email='%s'", _user, _email)
 
             if not _user or not _email or not _pw or not _pw2:
                 st.session_state.auth_error = "يرجى ملء جميع الحقول."
@@ -332,12 +346,16 @@ if not st.session_state.token:
                 with st.spinner("جارٍ إنشاء حسابك…"):
                     data, err = api_register(_user, _email, _pw)
                 if data:
+                    import json
                     st.session_state.token = data["token"]
                     st.session_state.user  = data
+                    # ← حفظ في Cookies
+                    cookies["token"]     = data["token"]
+                    cookies["user_json"] = json.dumps(data)
+                    cookies.save()
                     logger.info("🎉 حساب جديد | user_id=%s", data.get("user_id"))
                 else:
                     st.session_state.auth_error = err
-
             st.rerun()
 
     st.stop()
@@ -356,8 +374,11 @@ with col_name:
                 unsafe_allow_html=True)
 with col_out:
     if st.button("خروج", key="btn_logout"):
-        logger.info("🚪 خروج | user_id=%s", uid)
-        for k in ["token", "user", "auth_error", "auth_ok", "last_refresh",
+        # ← مسح الـ Cookies عند الخروج
+        cookies["token"]     = ""
+        cookies["user_json"] = ""
+        cookies.save()
+        for k in ["token", "user", "auth_error", "last_refresh",
                   "_login_id", "_login_pw", "_reg_user", "_reg_email",
                   "_reg_pw", "_reg_pw2", "_login_submitted", "_reg_submitted"]:
             st.session_state[k] = None if k in ("token", "user") else (
@@ -378,10 +399,13 @@ if st.button("↻  تحديث الرصيد", use_container_width=True):
     with st.spinner("جارٍ جلب البيانات…"):
         fresh = api_me(st.session_state.token)
     if fresh:
-        st.session_state.user         = {**user, **fresh, "user_id": fresh["user_id"]}
+        import json
+        updated = {**user, **fresh, "user_id": fresh["user_id"]}
+        st.session_state.user         = updated
         st.session_state.last_refresh = time.time()
-        logger.info("🔄 رصيد محدَّث | user_id=%s | balance=%.4f",
-                    uid, fresh.get("balance", 0))
+        # ← تحديث الـ Cookie بالبيانات الجديدة
+        cookies["user_json"] = json.dumps(updated)
+        cookies.save()
         st.rerun()
     else:
         st.markdown('<div class="rh-alert error">⚠️ تعذّر تحديث الرصيد.</div>',
@@ -398,7 +422,6 @@ WALLS = [
 ]
 
 for name, url, color, desc in WALLS:
-    logger.info("🔗 توليد رابط %s | uid=%s", name, uid)
     components.html(f"""
     <!DOCTYPE html><html><head><meta charset="utf-8">
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet">
