@@ -26,12 +26,20 @@ RAILWAY_URL       = "https://web-production-864fec.up.railway.app"   # ← تم 
 BITLABS_TOKEN     = "DCDEC791-3E5B-484D-B11C-3404631079D0"
 ADGEM_APP_ID      = "32570"
 ADGEM_POSTBACK    = "hgda9gcjc891dljf0n9lha13"
+CPX_APP_ID        = "33109"
 
 def bl_url(uid):
     return f"https://web.bitlabs.ai/?token={BITLABS_TOKEN}&uid={uid}"
 
 def ag_url(uid):
     return f"https://adunits.adgem.com/wall?appid={ADGEM_APP_ID}&player_id={uid}"
+
+def cpx_url(uid):
+    import hashlib
+    secure = "S5BVhx4aOGlnHQb06cvkhI09VN2K3ASY"
+    h = hashlib.md5(f"{uid}-{secure}".encode()).hexdigest()
+    return (f"https://offers.cpx-research.com/index.php"
+            f"?app_id={CPX_APP_ID}&ext_user_id={uid}&secure_hash={h}")
 
 HEADERS = {
     "Content-Type":  "application/json",
@@ -532,13 +540,16 @@ def render_offer_cards():
     logged = st.session_state.logged_in
     uid    = st.session_state.user_data.get("id", 0) if logged else 0
 
-    _bl = bl_url(uid) if logged else "#"
-    _ag = ag_url(uid) if logged else "#"
+    _bl  = bl_url(uid)  if logged else "#"
+    _ag  = ag_url(uid)  if logged else "#"
+    _cpx = cpx_url(uid) if logged else "#"
 
-    onclick_bl = f"window.open('{_bl}','_blank')" if logged else \
+    onclick_bl  = f"window.open('{_bl}','_blank')"  if logged else \
         "window.__triggerLogin('Sign in to start earning with BitLabs')"
-    onclick_ag = f"window.open('{_ag}','_blank')" if logged else \
+    onclick_ag  = f"window.open('{_ag}','_blank')"  if logged else \
         "window.__triggerLogin('Sign in to start earning with AdGem')"
+    onclick_cpx = f"window.open('{_cpx}','_blank')" if logged else \
+        "window.__triggerLogin('Sign in to start earning with CPX Research')"
 
     lock_overlay = "" if logged else """
     <div style="position:absolute;inset:0;border-radius:20px;z-index:2;
@@ -680,6 +691,37 @@ window.__triggerLogin = function(reason){{
         </div>
       </div>
       <div class="arr blue">→</div>
+    </button>
+  </div>
+
+  <!-- CPX Research -->
+  <div class="card" style="border-color:rgba(62,207,142,.1)">
+    <div style="position:absolute;top:-60px;right:-60px;width:200px;height:200px;
+                background:radial-gradient(circle,rgba(62,207,142,.08) 0%,transparent 65%);pointer-events:none;"></div>
+    {lock_overlay}
+    <div class="hrow">
+      <div class="provider" style="color:#3ecf8e;background:rgba(62,207,142,.07);border:1px solid rgba(62,207,142,.2)">
+        <div class="dot g"></div>CPX Research
+      </div>
+    </div>
+    <div class="title">Paid Surveys — Premium</div>
+    <div class="desc">High-quality market research surveys · Instant USD rewards</div>
+    <div class="tags">
+      <span class="tag">📊 Surveys</span>
+      <span class="tag">💵 USD Payout</span>
+      <span class="tag">⚡ Instant</span>
+      <span class="tag">🌍 Worldwide</span>
+    </div>
+    <button class="cta" style="background:linear-gradient(135deg,rgba(62,207,142,.1),rgba(62,207,142,.05));
+            border:1px solid rgba(62,207,142,.2);" onclick="{onclick_cpx}">
+      <div class="cta-l">
+        <span class="cta-ico">📋</span>
+        <div>
+          <div class="ct" style="color:#3ecf8e">{'Start Earning — CPX Research' if logged else 'Sign In to Unlock'}</div>
+          <div class="cs" style="color:#1a6644">{'App ID 33109 · user ' + str(uid) if logged else 'Free Account Required'}</div>
+        </div>
+      </div>
+      <div class="arr" style="color:rgba(62,207,142,.45)">→</div>
     </button>
   </div>
 </div>
