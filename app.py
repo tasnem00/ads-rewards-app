@@ -229,11 +229,18 @@ if not st.session_state.token:
         st.markdown('<div class="auth-title">أهلاً بعودتك 👋</div>',
                     unsafe_allow_html=True)
 
-        identifier = st.text_input("البريد الإلكتروني أو اسم المستخدم",
-                                   placeholder="you@example.com",
-                                   key="li_id")
-        password   = st.text_input("كلمة المرور", type="password",
-                                   placeholder="••••••••", key="li_pw")
+        for k, default in [("li_id",""), ("li_pw","")]:
+            if k not in st.session_state:
+                st.session_state[k] = default
+
+        st.text_input("البريد الإلكتروني أو اسم المستخدم",
+                      placeholder="you@example.com",
+                      key="li_id")
+        st.text_input("كلمة المرور", type="password",
+                      placeholder="••••••••", key="li_pw")
+
+        identifier = st.session_state.li_id.strip()
+        password   = st.session_state.li_pw
 
         if st.session_state.auth_error:
             st.markdown(f'<div class="rh-alert error">⚠️ {st.session_state.auth_error}</div>',
@@ -244,10 +251,12 @@ if not st.session_state.token:
 
         if st.button("تسجيل الدخول", use_container_width=True,
                      type="primary", key="btn_login"):
-            if not identifier or not password:
-                st.session_state.auth_error = "يرجى ملء جميع الحقول."
+            logger.info("🖱️ ضغط تسجيل دخول | identifier='%s'", identifier)
+            if not identifier:
+                st.session_state.auth_error = "يرجى إدخال البريد أو اسم المستخدم."
+            elif not password:
+                st.session_state.auth_error = "يرجى إدخال كلمة المرور."
             else:
-                logger.info("🖱️ محاولة دخول | identifier=%s", identifier)
                 with st.spinner("جارٍ التحقق…"):
                     data, err = api_login(identifier, password)
                 if data:
@@ -255,6 +264,8 @@ if not st.session_state.token:
                     st.session_state.user       = data
                     st.session_state.auth_error = ""
                     st.session_state.auth_ok    = ""
+                    for k in ["li_id","li_pw"]:
+                        st.session_state[k] = ""
                     logger.info("✅ دخول ناجح في الواجهة | user_id=%s", data["user_id"])
                     st.rerun()
                 else:
@@ -266,12 +277,29 @@ if not st.session_state.token:
         st.markdown('<div class="auth-title">إنشاء حساب جديد 🚀</div>',
                     unsafe_allow_html=True)
 
-        r_username = st.text_input("اسم المستخدم", placeholder="ahmed_123", key="rg_user")
-        r_email    = st.text_input("البريد الإلكتروني", placeholder="you@example.com", key="rg_email")
-        r_pw       = st.text_input("كلمة المرور (6 أحرف على الأقل)",
-                                   type="password", placeholder="••••••••", key="rg_pw")
-        r_pw2      = st.text_input("تأكيد كلمة المرور",
-                                   type="password", placeholder="••••••••", key="rg_pw2")
+        # نستخدم on_change لتخزين القيم فور الكتابة — يحل مشكلة "Press Enter to apply"
+        for k, default in [("rg_user",""), ("rg_email",""), ("rg_pw",""), ("rg_pw2","")]:
+            if k not in st.session_state:
+                st.session_state[k] = default
+
+        st.text_input("اسم المستخدم",
+                      placeholder="ahmed_123",
+                      key="rg_user")
+        st.text_input("البريد الإلكتروني",
+                      placeholder="you@example.com",
+                      key="rg_email")
+        st.text_input("كلمة المرور (6 أحرف على الأقل)",
+                      type="password", placeholder="••••••••",
+                      key="rg_pw")
+        st.text_input("تأكيد كلمة المرور",
+                      type="password", placeholder="••••••••",
+                      key="rg_pw2")
+
+        # اقرأ القيم مباشرة من session_state — مضمونة دائماً
+        r_username = st.session_state.rg_user.strip()
+        r_email    = st.session_state.rg_email.strip()
+        r_pw       = st.session_state.rg_pw
+        r_pw2      = st.session_state.rg_pw2
 
         if st.session_state.auth_error:
             st.markdown(f'<div class="rh-alert error">⚠️ {st.session_state.auth_error}</div>',
@@ -282,12 +310,20 @@ if not st.session_state.token:
 
         if st.button("إنشاء الحساب", use_container_width=True,
                      type="primary", key="btn_reg"):
-            if not all([r_username, r_email, r_pw, r_pw2]):
-                st.session_state.auth_error = "يرجى ملء جميع الحقول."
+            logger.info("🖱️ ضغط إنشاء حساب | user='%s' email='%s'",
+                        r_username, r_email)
+            if not r_username:
+                st.session_state.auth_error = "يرجى إدخال اسم المستخدم."
+            elif not r_email:
+                st.session_state.auth_error = "يرجى إدخال البريد الإلكتروني."
+            elif not r_pw:
+                st.session_state.auth_error = "يرجى إدخال كلمة المرور."
+            elif not r_pw2:
+                st.session_state.auth_error = "يرجى تأكيد كلمة المرور."
             elif r_pw != r_pw2:
                 st.session_state.auth_error = "كلمتا المرور غير متطابقتين."
             else:
-                logger.info("🖱️ محاولة تسجيل | username=%s email=%s", r_username, r_email)
+                logger.info("📤 إرسال طلب تسجيل | username=%s email=%s", r_username, r_email)
                 with st.spinner("جارٍ إنشاء حسابك…"):
                     data, err = api_register(r_username, r_email, r_pw)
                 if data:
@@ -295,6 +331,9 @@ if not st.session_state.token:
                     st.session_state.user       = data
                     st.session_state.auth_error = ""
                     st.session_state.auth_ok    = ""
+                    # مسح حقول التسجيل
+                    for k in ["rg_user","rg_email","rg_pw","rg_pw2"]:
+                        st.session_state[k] = ""
                     logger.info("🎉 حساب جديد في الواجهة | user_id=%s", data["user_id"])
                     st.rerun()
                 else:
