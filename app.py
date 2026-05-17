@@ -33,7 +33,7 @@ logger = logging.getLogger("frontend")
 # ─────────────────────────────────────────────
 #  Config
 # ─────────────────────────────────────────────
-RAILWAY_URL   = "https://harmonious-recreation-production.up.railway.app"
+RAILWAY_URL = "https://harmonious-recreation-production.up.railway.app"
 BITLABS_TOKEN = "DCDEC791-3E5B-484D-B11C-3404631079D0"
 ADGEM_APP_ID  = "32570"
 CPX_APP_ID    = "33109"
