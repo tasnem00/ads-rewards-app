@@ -726,7 +726,7 @@ window.__triggerLogin = function(reason){{
   </div>
 </div>
 </body></html>
-""", height=560)
+""", height=900)
 
 
 # ════════════════════════════════════════════════════
