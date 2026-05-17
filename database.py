@@ -13,7 +13,8 @@ from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = "sqlite:///./rewards.db"
+import os
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./rewards.db")
 
 engine = create_engine(
     DATABASE_URL,
