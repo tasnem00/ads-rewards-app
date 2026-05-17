@@ -71,6 +71,10 @@ app = FastAPI(
 )
 from postback_routes import router as postback_router
 app.include_router(postback_router)
+
+
+from withdraw_routes import router as withdraw_router
+app.include_router(withdraw_router)
 # ─────────────────────────────────────────────
 #  Idempotency Cache
 # ─────────────────────────────────────────────
