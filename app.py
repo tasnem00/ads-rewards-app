@@ -125,7 +125,6 @@ def api_me(token: str) -> dict:
 #  إعداد الصفحة
 # ─────────────────────────────────────────────
 st.set_page_config(page_title="Rewards Hub", page_icon="💎", layout="centered")
-
 # ─────────────────────────────────────────────
 #  Cookies Manager  ← يحفظ الجلسة بعد الـ refresh
 # ─────────────────────────────────────────────
