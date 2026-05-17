@@ -69,8 +69,8 @@ app = FastAPI(
     version     = "2.0.0",
     lifespan    = lifespan,
 )
-
-
+from postback_routes import router as postback_router
+app.include_router(postback_router)
 # ─────────────────────────────────────────────
 #  Idempotency Cache
 # ─────────────────────────────────────────────
